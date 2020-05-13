@@ -9,6 +9,7 @@ license = "MIT"
 python = "^3.8"
 
 [tool.poetry.dev-dependencies]
+wheel = "^0.34.2"
 
 [tool.dephell.main]
 from = {format = "poetry", path = "pyproject.toml"}

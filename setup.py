@@ -20,7 +20,7 @@ setup(
     long_description=README,
     long_description_content_type='text/markdown',
     name='rsyncwrap',
-    version='0.1.0',
+    version='0.2.0',
     description='A python wrapper of rsync that yields stats updates.',
     python_requires='==3.*,>=3.8.0',
     author='Dustin Wyatt',
