@@ -14,7 +14,7 @@ for update in rsyncwrap(source, dest):
 
 `rsyncwrap` yields progress updates via `Stats` objects that have the following properties:
 
-* `in_progress_stats`: An instance of `TransferStats`.
+* `in_progress_stats`: An instance of `TransferStats` (see below for a description).
 * `transferring_path`: An instance of `pathlib.Path` that indicates the path that is currently
 transferring.
 * `last_completed_path`: An instance of `pathlib.Path` that indicates the last path to finish
@@ -26,6 +26,15 @@ transferring.
  destination when the transfer started.
 * `raw_output`: A list of lines we got from the underlying rsync command.  Useful for debugging
 during development.
+
+`TransferStats` objects look like this:
+
+* `transferred_bytes`:  The total bytes transferred for the current line of rsync output.
+* `percent`:  The percent complete for the current file being transferred.
+* `time`:  Rsync's estimated time for the current file being transferred.
+* `transfer_rate`:  Rsync's value for the current transfer in bytes.
+* `transfer_rate_unit`: Rsync's outputted transfer rate unit.  e.g. "MB/s"
+* `is_completed_stats`:  Is this the stats for a completed file transfer?
 
 
 Notes about how we use rsync:
