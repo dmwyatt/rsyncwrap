@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "rsyncwrap"
+version = "0.1.0"
+description = "A python wrapper of rsync that yields stats updates."
+authors = ["dmwyatt <dustin.wyatt@gmail.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+
+[tool.poetry.dev-dependencies]
+
+[tool.dephell.main]
+from = {format = "poetry", path = "pyproject.toml"}
+to = {format = "setuppy", path = "setup.py"}
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
