@@ -18,7 +18,7 @@ except ImportError:
 
 
 def _rsync(
-    source_locations: Sequence[str], dest_location: str, remote: Union[str] = ""
+    source_locations: Sequence[str], dest_location: str, ssh_config: Dict
 ) -> Iterator[Union[str, int]]:
     """
     Runs rsync and yields lines of output.
@@ -34,14 +34,21 @@ def _rsync(
             path = parse_location(l)[-1]
             assert path.exists(), f"Local source '{path}' does not exist."
 
-    # Build command line
-    cmd = [
-        "rsync",
-        "-a",
-        "--progress",
-        *[str(p) for p in source_locations],
-        str(dest_path),
-    ]
+    # Build list of SSH config
+    # TODO: Remove ";" for security
+    ssh = [f"{k} {v}" for k, v in ssh_config.items()]
+
+    # Build command line. Start with basic rsync
+    cmd = ["rsync", "--archive", "--progress"]
+    # Add SSH specific config
+    if ssh:
+        ssh.insert(0, "-e ssh")
+        cmd.append(" ".join(ssh))
+    # Add sources
+    cmd.append(*[str(p) for p in source_locations])
+    # Add destination
+    cmd.append(str(dest_path))
+
     # print(cmd)
     # exit(0)
     cp = subprocess.Popen(
@@ -342,7 +349,10 @@ class Stats:
 
 
 def rsyncwrap(
-    source: str, dest: str, include_raw_output=False
+    source: str,
+    dest: str,
+    ssh_config: Dict = {},
+    include_raw_output: bool = False,
 ) -> Iterator[Union[int, Stats]]:
     """
     Copy the directory "source" into the directory "dest".
@@ -381,7 +391,7 @@ def rsyncwrap(
     transferred_bytes = 0
     last_stats_update: Union[None, TransferStats] = None
 
-    for line in _rsync([source], dest):
+    for line in _rsync([source], dest, ssh_config):
         # The _rsync callable returns the integer exit code as the last thing.
         if isinstance(line, int):
             yield line
