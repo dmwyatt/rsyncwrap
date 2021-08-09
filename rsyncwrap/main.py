@@ -9,7 +9,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Sequence, Union
 
-from rsyncwrap.helpers import parts_to_path
+from rsyncwrap.helpers import is_remote, parse_location, parts_to_path
 
 try:
     from functools import cached_property
@@ -17,17 +17,33 @@ except ImportError:
     from rsyncwrap.helpers import cached_property
 
 
-def _rsync(source_paths: Sequence[Path], dest_path: Path) -> Iterator[Union[str, int]]:
+def _rsync(
+    source_locations: Sequence[str], dest_location: str, remote: Union[str] = ""
+) -> Iterator[Union[str, int]]:
     """
     Runs rsync and yields lines of output.
     """
+    # If remote is local, make sure dir exists
+    dest_user, dest_remote, dest_path = parse_location(dest_location)
+    if not is_remote(dest_location):
+        assert dest_path.is_dir(), f"{dest_path} is not a directory."
+
+    # Make sure local sources must exist
+    for l in source_locations:
+        if not is_remote(l):
+            path = parse_location(l)[-1]
+            assert path.exists(), f"Local source '{path}' does not exist."
+
+    # Build command line
     cmd = [
         "rsync",
         "-a",
         "--progress",
-        *[str(p) for p in source_paths],
+        *[str(p) for p in source_locations],
         str(dest_path),
     ]
+    # print(cmd)
+    # exit(0)
     cp = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf8"
     )
@@ -160,7 +176,11 @@ class Line:
     @cached_property
     def is_path(self) -> bool:
         """Tells us if the line is a path that exists."""
-        return self.as_path and self.as_path.exists()
+        # Does not exist if on a remote. If it's reported by rsync
+        # don't we know that it exists? Do we need to run .exists()?
+        # return self.as_path and self.as_path.exists()
+        # Can we check if it is valid path syntax?
+        return self.as_path
 
     @cached_property
     def is_source_root(self) -> bool:
@@ -277,6 +297,7 @@ class Stats:
     """
     A summary of rsync stats.
     """
+
     in_progress_stats: Union[None, TransferStats]
     transferring_path: Union[None, Path]
     last_completed_path: Union[None, Path]
@@ -320,7 +341,9 @@ class Stats:
         )
 
 
-def rsyncwrap(source: Path, dest: Path, include_raw_output=False) -> Iterator[Union[int, Stats]]:
+def rsyncwrap(
+    source: str, dest: str, include_raw_output=False
+) -> Iterator[Union[int, Stats]]:
     """
     Copy the directory "source" into the directory "dest".
 
@@ -345,11 +368,10 @@ def rsyncwrap(source: Path, dest: Path, include_raw_output=False) -> Iterator[Un
     #  transferred. This will give us info about how much of the source was already
     #  at the destination.
 
-    assert source.exists(), f"{source} does not exist."
-    source = source.resolve()
-
-    assert dest.is_dir(), f"{dest} is not a directory."
-    dest = dest.resolve()
+    # Rsync does not support remote to remote syncing
+    assert not (
+        is_remote(source) and is_remote(dest)
+    ), "Source and destination both remote."
 
     transferring_path: Union[None, Path] = None
     last_completed_path: Union[None, Path] = None
@@ -365,7 +387,9 @@ def rsyncwrap(source: Path, dest: Path, include_raw_output=False) -> Iterator[Un
             yield line
             continue
 
-        line = Line(line, source)
+        # line = Line(line, source)
+        # Would it be nicer to add support for location parsing in the Line class?
+        line = Line(line, parse_location(source)[-1])
 
         if line.is_stats_line:
             # Sanity check.  We shouldn't have a stats line until
