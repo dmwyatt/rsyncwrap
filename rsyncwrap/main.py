@@ -397,6 +397,7 @@ def rsyncwrap(
 
     for line in _rsync([source], dest, ssh_config, dry_run):
         # The _rsync callable returns the integer exit code as the last thing.
+        # In that case, we are done. Exit loop.
         if isinstance(line, int):
             yield line
             continue

@@ -18,7 +18,10 @@ source = '/the_source'
 dest = '/the_destination'
 
 for update in rsyncwrap(source, dest):
-    print(update)
+    if isinstance(update, int):
+        print("Exitcode:", update)
+    else:
+        print(update)
 ```
 
 ## Syncing from remote source
