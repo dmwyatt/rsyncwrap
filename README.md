@@ -1,4 +1,12 @@
 # A library for using rsync from python.
+* We call rsync with the `-a` option. This means it's recursive and preserves everything except
+hard links.
+* This early version only supports transferring the `source` directory *into* the destination
+directory.  In other words, in the above example we'd end up with `/the_destination/the_source`.
+* Of course, since this is rsync, we only transfer changed bytes and this means it's a resumable
+process.
+* In my testing rsync yields a stats update about once a second, so that's how often we yield
+them to the caller.
 
 # How to use
 Perform a sync between local source and local
@@ -68,15 +76,3 @@ during development.
 * `transfer_rate`:  Rsync's value for the current transfer in bytes.
 * `transfer_rate_unit`: Rsync's outputted transfer rate unit.  e.g. "MB/s"
 * `is_completed_stats`:  Is this the stats for a completed file transfer?
-
-
-# Notes about how we use rsync:
-
-* We call rsync with the `-a` option. This means it's recursive and preserves everything except
-hard links.
-* This early version only supports transferring the `source` directory *into* the destination
-directory.  In other words, in the above example we'd end up with `/the_destination/the_source`.
-* Of course, since this is rsync, we only transfer changed bytes and this means it's a resumable
-process.
-* In my testing rsync yields a stats update about once a second, so that's how often we yield
-them to the caller.
