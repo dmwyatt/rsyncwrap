@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional, Sequence, Union
+from typing import Dict, Iterator, List, Tuple, Optional, Sequence, Union
 
 from rsyncwrap.helpers import is_remote, parse_location, parts_to_path
 
@@ -354,7 +354,7 @@ class Stats:
 def rsyncwrap(
     source: str,
     dest: str,
-    ssh_config: Dict = {},
+    ssh_config: Sequence[Tuple] = [],
     dry_run: bool = False,
     include_raw_output: bool = False,
 ) -> Iterator[Union[int, Stats]]:
@@ -366,14 +366,17 @@ def rsyncwrap(
 
     Use like so:
 
-    >>> for update in rsyncwrap(Path("/the_source_dir"), Path("/the/destination")):
+    >>> for update in rsyncwrap("/the_source_dir", "/the/destination"):
     ...     print(update)
 
     This gives you a succession of stats updates while copying the source and ending
     up with the source located at "/the/destination/the_source_dir".
+    For a remote source of destination, specify it as '<user>@<system>:<path>'
 
     :param source: The directory we want to copy
     :param dest: The directory we want to copy source into.
+    :param ssh_config: SSH configuration. List of tuples ('param', 'value')
+    :param dry_run: Run rsync with option '--dry-run'
     :param include_raw_output: A debugging helper that includes the raw output text
         from rsync with the yielded stats.
     """
