@@ -18,17 +18,17 @@ except ImportError:
 
 
 def _rsync(
-    source_locations: Sequence[str], dest_location: str, ssh_config: Dict
+    source_locations: Sequence[str], dest_location: str, ssh_config: Dict, dry_run: bool
 ) -> Iterator[Union[str, int]]:
     """
     Runs rsync and yields lines of output.
     """
-    # If remote is local, make sure dir exists
+    # If destination is local, make sure dir exists
     dest_user, dest_remote, dest_path = parse_location(dest_location)
     if not is_remote(dest_location):
         assert dest_path.is_dir(), f"{dest_path} is not a directory."
 
-    # Make sure local sources must exist
+    # Make sure local sources, if any, must exist
     for l in source_locations:
         if not is_remote(l):
             path = parse_location(l)[-1]
@@ -39,6 +39,9 @@ def _rsync(
 
     # Build command line. Start with basic rsync
     cmd = ["rsync", "--archive", "--progress"]
+    # Configure dry run
+    if dry_run:
+        cmd.append("--dry-run")
     # Add SSH specific config
     if ssh:
         # TODO: Remove ";" for security
@@ -47,7 +50,7 @@ def _rsync(
     # Add sources
     cmd.append(*[str(p) for p in source_locations])
     # Add destination
-    cmd.append(str(dest_path))
+    cmd.append(dest_location)
 
     # print(cmd)
     # exit(0)
@@ -352,6 +355,7 @@ def rsyncwrap(
     source: str,
     dest: str,
     ssh_config: Dict = {},
+    dry_run: bool = False,
     include_raw_output: bool = False,
 ) -> Iterator[Union[int, Stats]]:
     """
@@ -391,7 +395,7 @@ def rsyncwrap(
     transferred_bytes = 0
     last_stats_update: Union[None, TransferStats] = None
 
-    for line in _rsync([source], dest, ssh_config):
+    for line in _rsync([source], dest, ssh_config, dry_run):
         # The _rsync callable returns the integer exit code as the last thing.
         if isinstance(line, int):
             yield line
