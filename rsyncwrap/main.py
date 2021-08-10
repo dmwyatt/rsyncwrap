@@ -35,13 +35,13 @@ def _rsync(
             assert path.exists(), f"Local source '{path}' does not exist."
 
     # Build list of SSH config
-    # TODO: Remove ";" for security
-    ssh = [f"{k} {v}" for k, v in ssh_config.items()]
+    ssh = [f"{o[0]} {o[1]}" for o in ssh_config]
 
     # Build command line. Start with basic rsync
     cmd = ["rsync", "--archive", "--progress"]
     # Add SSH specific config
     if ssh:
+        # TODO: Remove ";" for security
         ssh.insert(0, "-e ssh")
         cmd.append(" ".join(ssh))
     # Add sources

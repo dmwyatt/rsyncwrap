@@ -1,16 +1,49 @@
 # A library for using rsync from python.
 
+# How to use
+Perform a sync between local source and local
+destination like this.
 ```python
-from pathlib import Path
-
 from rsyncwrap import rsyncwrap
 
-source = Path('/the_source')
-dest = Path('/the_destination')
+source = '/the_source'
+dest = '/the_destination'
 
 for update in rsyncwrap(source, dest):
     print(update)
 ```
+
+## Syncing from remote source
+Remote sources over SSH are supported. The source MUST
+be specified as `<user>@<system>:<path>`. Strings of any
+other format, will be assumed to be a local path.
+```python
+from rsyncwrap import rsyncwrap
+
+source = 'user@remote.system.org:/the_source')
+dest = '/the_destination'
+
+for update in rsyncwrap(source, dest):
+    print(update)
+```
+
+## Custom SSH configuration
+How to run with custom configuration of SSH. The parameters
+available are described in the [SSH documentation](https://linux.die.net/man/5/ssh_config).
+Both long and short form can be used. That is, the port to use can be configured
+as `("-p","22")` or as `("-o", "Port=22")`.
+```python
+from rsyncwrap import rsyncwrap
+
+source = 'user@remote.system.org:/the_source'
+dest = '/the_destination'
+
+ssh_config = [("-o", "Port=22"), ("-o", "StrictHostKeyChecking=no")]
+for update in rsyncwrap(source, dest, ssh_config=ssh_config):
+    print(update)
+```
+
+# Statistics
 
 `rsyncwrap` yields progress updates via `Stats` objects that have the following properties:
 
@@ -37,7 +70,7 @@ during development.
 * `is_completed_stats`:  Is this the stats for a completed file transfer?
 
 
-Notes about how we use rsync:
+# Notes about how we use rsync:
 
 * We call rsync with the `-a` option. This means it's recursive and preserves everything except
 hard links.
