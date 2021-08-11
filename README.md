@@ -39,17 +39,20 @@ for update in rsyncwrap(source, dest):
 ```
 
 ## Custom SSH configuration
-How to run with custom configuration of SSH. The parameters
+How to run with custom configuration of SSH. The SSH parameters
 available are described in the [SSH documentation](https://linux.die.net/man/5/ssh_config).
-Both long and short form can be used. That is, the port to use can be configured
-as `("-p","22")` or as `("-o", "Port=22")`.
+The long form must be used as seen in the example below. The content of the
+dictionary will be passed to rsync as `-e ssh -o <option>=<value>`.
 ```python
 from rsyncwrap import rsyncwrap
 
 source = 'user@remote.system.org:/the_source'
 dest = '/the_destination'
 
-ssh_config = [("-o", "Port=22"), ("-o", "StrictHostKeyChecking=no")]
+ssh_config = {
+    "Port": 22,
+    "StrictHostKeyChecking": "no"
+}
 for update in rsyncwrap(source, dest, ssh_config=ssh_config):
     print(update)
 ```

@@ -34,8 +34,8 @@ def _rsync(
             path = parse_location(l)[-1]
             assert path.exists(), f"Local source '{path}' does not exist."
 
-    # Build list of SSH config
-    ssh = [f"{o[0]} {o[1]}" for o in ssh_config]
+    # Build list of SSH config options
+    ssh = [f"-o {k}={v}" for k, v in ssh_config.items()]
 
     # Build command line. Start with basic rsync
     cmd = ["rsync", "--archive", "--progress"]
@@ -44,7 +44,6 @@ def _rsync(
         cmd.append("--dry-run")
     # Add SSH specific config
     if ssh:
-        # TODO: Remove ";" for security
         ssh.insert(0, "-e ssh")
         cmd.append(" ".join(ssh))
     # Add sources
@@ -52,8 +51,12 @@ def _rsync(
     # Add destination
     cmd.append(dest_location)
 
-    # print(cmd)
-    # exit(0)
+    # Char ";" is invalid for security. Is it handled elsewhere by Python magic?
+    # Note: := is new in Python 3.8
+    if ";" in (l := " ".join(cmd)):
+        raise ValueError(f"Command line contains ';': '{l}'")
+    #print(cmd)
+    #exit(0)
     cp = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf8"
     )
@@ -354,7 +357,7 @@ class Stats:
 def rsyncwrap(
     source: str,
     dest: str,
-    ssh_config: Sequence[Tuple] = [],
+    ssh_config: Dict = {},
     dry_run: bool = False,
     include_raw_output: bool = False,
 ) -> Iterator[Union[int, Stats]]:
