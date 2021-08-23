@@ -51,12 +51,6 @@ def _rsync(
     # Add destination
     cmd.append(dest_location)
 
-    # Char ";" is invalid for security. Is it handled elsewhere by Python magic?
-    # Note: := is new in Python 3.8
-    if ";" in (l := " ".join(cmd)):
-        raise ValueError(f"Command line contains ';': '{l}'")
-    #print(cmd)
-    #exit(0)
     cp = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf8"
     )
@@ -188,12 +182,11 @@ class Line:
 
     @cached_property
     def is_path(self) -> bool:
-        """Tells us if the line is a path that exists."""
-        # Does not exist if on a remote. If it's reported by rsync
-        # don't we know that it exists? Do we need to run .exists()?
-        # return self.as_path and self.as_path.exists()
-        # Can we check if it is valid path syntax?
-        return self.as_path
+        """Tells us if the line is a path"""
+        if isinstance(self.as_path, Path):
+            return True
+        else:
+            return False
 
     @cached_property
     def is_source_root(self) -> bool:
@@ -406,10 +399,8 @@ def rsyncwrap(
         # In that case, we are done. Exit loop.
         if isinstance(line, int):
             yield line
-            continue
+            break
 
-        # line = Line(line, source)
-        # Would it be nicer to add support for location parsing in the Line class?
         line = Line(line, parse_location(source)[-1])
 
         if line.is_stats_line:
