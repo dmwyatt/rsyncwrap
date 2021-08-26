@@ -1,5 +1,6 @@
+import re
 from pathlib import Path
-from typing import Sequence
+from typing import Sequence, Union, Tuple
 
 
 class cached_property:
@@ -34,3 +35,35 @@ def parts_to_path(parts: Sequence[str]) -> Path:
     for part in parts:
         path /= part
     return path
+
+
+def is_remote(location: str) -> bool:
+    """
+    Is location remote (<user>@<remote>:<path>)?
+    """
+    user, remote, path = parse_location(location)
+    return bool(user and remote and path)
+
+
+def parse_location(location: str) -> Tuple[Union[str, None], Union[str, None], Path]:
+    """
+    Parse a location and return user, remote & path.
+    If location is local, user & remote are None.
+    """
+    # Remove ";" as a security meassure
+    location = location.replace(";", "")
+    try:
+        # Matching "<user>@<remote>:<path>"
+        p = re.compile(r"^(.+)@(.+):(.+)$")
+        m = p.match(location)
+        user, remote = m.group(1, 2)
+        path = Path(m.group(3))
+    except AttributeError:
+        # Did not match all 3 groups. Expect a path
+        user = None
+        remote = None
+        path = Path(location)
+
+    assert path.is_absolute(), f"'{path}' is not an absolute path."
+
+    return user, remote, path

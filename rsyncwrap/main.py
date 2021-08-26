@@ -7,9 +7,9 @@ import time
 from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional, Sequence, Union
+from typing import Dict, Iterator, List, Tuple, Optional, Sequence, Union
 
-from rsyncwrap.helpers import parts_to_path
+from rsyncwrap.helpers import is_remote, parse_location, parts_to_path
 
 try:
     from functools import cached_property
@@ -17,17 +17,40 @@ except ImportError:
     from rsyncwrap.helpers import cached_property
 
 
-def _rsync(source_paths: Sequence[Path], dest_path: Path) -> Iterator[Union[str, int]]:
+def _rsync(
+    source_locations: Sequence[str], dest_location: str, ssh_config: Dict, dry_run: bool
+) -> Iterator[Union[str, int]]:
     """
     Runs rsync and yields lines of output.
     """
-    cmd = [
-        "rsync",
-        "-a",
-        "--progress",
-        *[str(p) for p in source_paths],
-        str(dest_path),
-    ]
+    # If destination is local, make sure dir exists
+    dest_user, dest_remote, dest_path = parse_location(dest_location)
+    if not is_remote(dest_location):
+        assert dest_path.is_dir(), f"{dest_path} is not a directory."
+
+    # Make sure local sources, if any, must exist
+    for l in source_locations:
+        if not is_remote(l):
+            path = parse_location(l)[-1]
+            assert path.exists(), f"Local source '{path}' does not exist."
+
+    # Build list of SSH config options
+    ssh = [f"-o {k}={v}" for k, v in ssh_config.items()]
+
+    # Build command line. Start with basic rsync
+    cmd = ["rsync", "--archive", "--progress"]
+    # Configure dry run
+    if dry_run:
+        cmd.append("--dry-run")
+    # Add SSH specific config
+    if ssh:
+        ssh.insert(0, "-e ssh")
+        cmd.append(" ".join(ssh))
+    # Add sources
+    cmd.append(*[str(p) for p in source_locations])
+    # Add destination
+    cmd.append(dest_location)
+
     cp = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf8"
     )
@@ -159,8 +182,11 @@ class Line:
 
     @cached_property
     def is_path(self) -> bool:
-        """Tells us if the line is a path that exists."""
-        return self.as_path and self.as_path.exists()
+        """Tells us if the line is a path"""
+        if isinstance(self.as_path, Path):
+            return True
+        else:
+            return False
 
     @cached_property
     def is_source_root(self) -> bool:
@@ -277,6 +303,7 @@ class Stats:
     """
     A summary of rsync stats.
     """
+
     in_progress_stats: Union[None, TransferStats]
     transferring_path: Union[None, Path]
     last_completed_path: Union[None, Path]
@@ -320,7 +347,13 @@ class Stats:
         )
 
 
-def rsyncwrap(source: Path, dest: Path, include_raw_output=False) -> Iterator[Union[int, Stats]]:
+def rsyncwrap(
+    source: str,
+    dest: str,
+    ssh_config: Dict = {},
+    dry_run: bool = False,
+    include_raw_output: bool = False,
+) -> Iterator[Union[int, Stats]]:
     """
     Copy the directory "source" into the directory "dest".
 
@@ -329,14 +362,17 @@ def rsyncwrap(source: Path, dest: Path, include_raw_output=False) -> Iterator[Un
 
     Use like so:
 
-    >>> for update in rsyncwrap(Path("/the_source_dir"), Path("/the/destination")):
+    >>> for update in rsyncwrap("/the_source_dir", "/the/destination"):
     ...     print(update)
 
     This gives you a succession of stats updates while copying the source and ending
     up with the source located at "/the/destination/the_source_dir".
+    For a remote source of destination, specify it as '<user>@<system>:<path>'
 
     :param source: The directory we want to copy
     :param dest: The directory we want to copy source into.
+    :param ssh_config: SSH configuration. List of tuples ('param', 'value')
+    :param dry_run: Run rsync with option '--dry-run'
     :param include_raw_output: A debugging helper that includes the raw output text
         from rsync with the yielded stats.
     """
@@ -345,11 +381,10 @@ def rsyncwrap(source: Path, dest: Path, include_raw_output=False) -> Iterator[Un
     #  transferred. This will give us info about how much of the source was already
     #  at the destination.
 
-    assert source.exists(), f"{source} does not exist."
-    source = source.resolve()
-
-    assert dest.is_dir(), f"{dest} is not a directory."
-    dest = dest.resolve()
+    # Rsync does not support remote to remote syncing
+    assert not (
+        is_remote(source) and is_remote(dest)
+    ), "Source and destination both remote."
 
     transferring_path: Union[None, Path] = None
     last_completed_path: Union[None, Path] = None
@@ -359,13 +394,14 @@ def rsyncwrap(source: Path, dest: Path, include_raw_output=False) -> Iterator[Un
     transferred_bytes = 0
     last_stats_update: Union[None, TransferStats] = None
 
-    for line in _rsync([source], dest):
+    for line in _rsync([source], dest, ssh_config, dry_run):
         # The _rsync callable returns the integer exit code as the last thing.
+        # In that case, we are done. Exit loop.
         if isinstance(line, int):
             yield line
-            continue
+            break
 
-        line = Line(line, source)
+        line = Line(line, parse_location(source)[-1])
 
         if line.is_stats_line:
             # Sanity check.  We shouldn't have a stats line until
