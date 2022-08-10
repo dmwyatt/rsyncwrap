@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional, Sequence, Union
+from typing import Dict, Generator, List, Optional, Sequence, Union
 
 from rsyncwrap.helpers import parts_to_path
 
@@ -17,7 +17,7 @@ except ImportError:
     from rsyncwrap.helpers import cached_property
 
 
-def _rsync(source_paths: Sequence[Path], dest_path: Path) -> Iterator[Union[str, int]]:
+def _rsync(source_paths: Sequence[Path], dest_path: Path) -> Generator[Union[str, int], None, None]:
     """
     Runs rsync and yields lines of output.
     """
@@ -32,7 +32,7 @@ def _rsync(source_paths: Sequence[Path], dest_path: Path) -> Iterator[Union[str,
         cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf8"
     )
 
-    def cleanup():
+    def cleanup() -> None:
         """Helper to ensure that the rsync process gets killed at end of script.
 
         Very occasionally, the rsync subprocess seems to keep running if we're killed
@@ -68,7 +68,7 @@ def _rsync(source_paths: Sequence[Path], dest_path: Path) -> Iterator[Union[str,
     yield cp.returncode
 
 
-def rsync_available():
+def rsync_available() -> bool:
     cmd = ["rsync", "--version"]
     cp = subprocess.run(cmd, capture_output=True)
     if cp.returncode or cp.stderr:
@@ -129,7 +129,7 @@ class Line:
     raw_line: str
     source_path: Path
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.raw_line[-1] not in ("\n", "\r"):
             raise ValueError("Please provide `raw_line` including the line ending.")
 
@@ -277,23 +277,23 @@ class Stats:
     """
     A summary of rsync stats.
     """
-    in_progress_stats: Union[None, TransferStats]
-    transferring_path: Union[None, Path]
-    last_completed_path: Union[None, Path]
+    in_progress_stats: Optional[TransferStats]
+    transferring_path: Optional[Path]
+    last_completed_path: Optional[Path]
     completed_paths: Dict[Path, TransferStats]
-    last_completed_path_stats: Union[None, TransferStats]
+    last_completed_path_stats: Optional[TransferStats]
     total_transferred: int
     raw_output: List[str] = field(default_factory=list)
 
     @staticmethod
     def get_stats_data(
-        previous_stats: Union["Stats", None],
-        transferring_path: Union[None, Path],
-        in_progress_stats: Union[None, TransferStats],
-        last_completed_path: Union[None, Path],
-        last_completed_path_stats: Union[None, TransferStats],
+        previous_stats: Optional["Stats"],
+        transferring_path: Optional[Path],
+        in_progress_stats: Optional[TransferStats],
+        last_completed_path: Optional[Path],
+        last_completed_path_stats: Optional[TransferStats],
         total_transferred: int,
-        raw_output: Union[None, str],
+        raw_output: Optional[str],
     ) -> "Stats":
         """A builder of `Stats` instances."""
         completed_paths = getattr(previous_stats, "completed_paths", {})
@@ -320,7 +320,7 @@ class Stats:
         )
 
 
-def rsyncwrap(source: Path, dest: Path, include_raw_output=False) -> Iterator[Union[int, Stats]]:
+def rsyncwrap(source: Path, dest: Path, include_raw_output: bool = False) -> Generator[Union[int, Stats], None, None]:
     """
     Copy the directory "source" into the directory "dest".
 
